@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalshi Trading Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --text-dim: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --surface2: #1c2129;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+    padding: 16px; min-height: 100vh;
+  }
+  h1 { font-size: 20px; margin-bottom: 0; color: var(--accent); }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 12px; }
+
+  /* ---- Tabs ---- */
+  .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .tab-bar { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
+  .tab-btn {
+    padding: 6px 18px; border: none; border-radius: 6px; cursor: pointer;
+    font-size: 13px; font-weight: 500; color: var(--text-dim); background: transparent;
+    transition: all 0.15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { background: var(--accent); color: #fff; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; overflow: hidden;
+  }
+  .panel.full { grid-column: 1 / -1; }
+
+  .stats { display: flex; gap: 24px; margin-bottom: 16px; flex-wrap: wrap; }
+  .stat-label { font-size: 11px; text-transform: uppercase; color: var(--text-dim); }
+  .stat-value { font-size: 22px; font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--text-dim); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+
+  .side-badge {
+    display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+  }
+  .side-badge.yes { background: rgba(63, 185, 80, 0.15); color: var(--green); }
+  .side-badge.no { background: rgba(248, 81, 73, 0.15); color: var(--red); }
+
+  .bet-title { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+  .alloc-bar-track { background: var(--bg); border-radius: 4px; height: 8px; margin-top: 4px; }
+  .alloc-bar-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width 0.3s; }
+
+  .strategy-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px; margin-bottom: 12px;
+  }
+  .strategy-card:last-child { margin-bottom: 0; }
+  .strategy-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .strategy-name { font-weight: 600; font-size: 14px; }
+  .strategy-type { font-size: 11px; color: var(--text-dim); background: var(--bg); padding: 2px 8px; border-radius: 3px; }
+  .strategy-stats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+  .strategy-stat { font-size: 12px; }
+  .strategy-stat .label { color: var(--text-dim); font-size: 10px; text-transform: uppercase; }
+  .strategy-stat .value { font-variant-numeric: tabular-nums; }
+  .strategy-positions { margin-top: 8px; }
+  .strategy-positions table { font-size: 12px; }
+  .strategy-positions th { font-size: 10px; }
+
+  /* ---- Markets tab ---- */
+  .markets-grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+  @media (max-width: 1100px) { .markets-grid { grid-template-columns: 1fr; } }
+  .market-row { cursor: default; transition: background 0.1s; }
+  .market-row:hover { background: rgba(88, 166, 255, 0.05); }
+  .market-row.flash-green { animation: flashGreen 0.6s; }
+  .market-row.flash-red { animation: flashRed 0.6s; }
+  @keyframes flashGreen { 0% { background: rgba(63, 185, 80, 0.15); } 100% { background: transparent; } }
+  @keyframes flashRed { 0% { background: rgba(248, 81, 73, 0.15); } 100% { background: transparent; } }
+  .market-title { font-size: 12px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .market-ticker { font-size: 11px; color: var(--text-dim); }
+  .spread { font-size: 11px; color: var(--text-dim); }
+
+  /* Orderbook */
+  .ob-panel { max-height: 600px; overflow-y: auto; }
+  .ob-title { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  .ob-side-label { font-size: 11px; text-transform: uppercase; color: var(--text-dim); margin: 8px 0 4px; }
+  .ob-row { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 4px; font-variant-numeric: tabular-nums; }
+  .ob-row .price { width: 50px; }
+  .ob-row .qty { width: 60px; text-align: right; }
+  .ob-row .bar { flex: 1; margin: 0 6px; position: relative; height: 16px; border-radius: 2px; }
+  .ob-row.yes-row .bar { background: rgba(63, 185, 80, 0.08); }
+  .ob-row.no-row .bar { background: rgba(248, 81, 73, 0.08); }
+  .ob-bar-fill { position: absolute; top: 0; height: 100%; border-radius: 2px; }
+  .ob-row.yes-row .ob-bar-fill { background: rgba(63, 185, 80, 0.3); right: 0; }
+  .ob-row.no-row .ob-bar-fill { background: rgba(248, 81, 73, 0.3); right: 0; }
+
+  /* Feed */
+  .feed-panel { max-height: 500px; overflow-y: auto; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+  .feed-item { padding: 4px 0; border-bottom: 1px solid var(--border); display: flex; gap: 8px; }
+  .feed-item:last-child { border-bottom: none; }
+  .feed-time { color: var(--text-dim); flex-shrink: 0; }
+  .feed-type { font-weight: 600; width: 72px; flex-shrink: 0; }
+  .feed-type.ticker { color: var(--accent); }
+  .feed-type.trade { color: var(--yellow); }
+  .feed-type.fill { color: var(--green); }
+  .feed-type.order { color: #bc8cff; }
+  .feed-type.balance { color: #f0883e; }
+  .feed-type.orderbook { color: #79c0ff; }
+
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .status-dot.idle { background: var(--text-dim); }
+  .status-dot.active { background: var(--green); }
+  .status-dot.paused { background: var(--yellow); }
+  .status-dot.error { background: var(--red); }
+
+  .disabled-label { font-size: 11px; color: var(--yellow); font-weight: 500; }
+
+  .live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .empty { color: var(--text-dim); font-style: italic; padding: 12px 0; }
+  .refresh-note { font-size: 11px; color: var(--text-dim); margin-top: 8px; }
+
+  /* Filter controls */
+  .filter-row { display: flex; gap: 16px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .search-input {
+    flex: 1; min-width: 200px; max-width: 300px;
+    padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg); color: var(--text); font-size: 13px;
+  }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-dim); }
+  .filter-checkbox { font-size: 12px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .filter-checkbox input { cursor: pointer; }
+
+  /* Sortable headers */
+  .sortable { cursor: pointer; user-select: none; position: relative; padding-right: 18px !important; }
+  .sortable:hover { color: var(--text); }
+  .sortable::after { content: ''; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); opacity: 0.3; }
+  .sortable.active::after { opacity: 1; }
+  .sortable.asc::after { content: '\\25B2'; font-size: 8px; }
+  .sortable.desc::after { content: '\\25BC'; font-size: 8px; }
+</style>
+</head>
+<body>
+
+<div class="header-row">
+  <h1>Kalshi Trading Dashboard</h1>
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+    <button class="tab-btn" data-tab="markets">Markets</button>
+  </div>
+</div>
+
+<!-- ==================== DASHBOARD TAB ==================== -->
+<div id="tab-dashboard" class="tab-content active">
+  <div class="grid">
+    <!-- Portfolio Panel -->
+    <div class="panel">
+      <h2>Portfolio</h2>
+      <div class="stats">
+        <div><div class="stat-label">Balance</div><div class="stat-value" id="balance">--</div></div>
+        <div><div class="stat-label">Portfolio Value</div><div class="stat-value" id="portfolio-value">--</div></div>
+      </div>
+      <table>
+        <thead><tr><th>Bet</th><th>Side</th><th class="num">Qty</th><th class="num">Exposure</th><th class="num">P&amp;L</th></tr></thead>
+        <tbody id="positions-body"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- Strategies Panel -->
+    <div class="panel">
+      <h2>Strategies</h2>
+      <div id="alloc-summary" class="stats"></div>
+      <div id="strategies-container"><div class="empty">Loading...</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MARKETS TAB ==================== -->
+<div id="tab-markets" class="tab-content">
+  <div class="markets-grid">
+    <!-- Markets Table -->
+    <div class="panel">
+      <h2><span class="live-dot"></span>Live Markets</h2>
+      <div class="stats">
+        <div><div class="stat-label">Open Markets</div><div class="stat-value" id="market-count">--</div></div>
+        <div><div class="stat-label">Showing</div><div class="stat-value" id="filtered-count">--</div></div>
+        <div><div class="stat-label">Live Tickers</div><div class="stat-value" id="live-ticker-count">--</div></div>
+        <div><div class="stat-label">Trades Seen</div><div class="stat-value" id="trade-count">0</div></div>
+      </div>
+      <!-- Filter controls -->
+      <div class="filter-row">
+        <input type="text" id="market-search" placeholder="Search markets..." class="search-input">
+        <label class="filter-checkbox"><input type="checkbox" id="hide-inactive"> Hide inactive (no bids)</label>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" data-sort="title">Market</th>
+              <th class="num sortable" data-sort="yes_bid">Yes Bid</th>
+              <th class="num sortable" data-sort="yes_ask">Yes Ask</th>
+              <th class="num sortable" data-sort="spread">Spread</th>
+              <th class="num sortable" data-sort="last_price">Last</th>
+              <th class="num sortable active desc" data-sort="volume_24h">Volume 24h</th>
+              <th class="num sortable" data-sort="open_interest">Open Int.</th>
+              <th class="sortable" data-sort="status">Status</th>
+            </tr>
+          </thead>
+          <tbody id="markets-body"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="refresh-note">Click column headers to sort. Markets auto-refresh every 30s.</div>
+    </div>
+
+    <!-- Right sidebar: orderbook + feed -->
+    <div>
+      <!-- Orderbook Panel -->
+      <div class="panel ob-panel" style="margin-bottom:16px">
+        <h2>Orderbook</h2>
+        <div id="orderbook-content"><div class="empty">Waiting for orderbook data...</div></div>
+      </div>
+
+      <!-- Live Feed -->
+      <div class="panel">
+        <h2><span class="live-dot"></span>Event Feed</h2>
+        <div id="feed" class="feed-panel"><div class="empty">Connecting to live stream...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.getElementById(s);
+const cents = (c) => '$' + (c / 100).toFixed(2);
+const pnlClass = (v) => v > 0 ? 'pos' : v < 0 ? 'neg' : '';
+
+function clearChildren(el) {
+  while (el.firstChild) el.removeChild(el.firstChild);
+}
+
+function createTextTd(text, className) {
+  const td = document.createElement('td');
+  if (className) td.className = className;
+  td.textContent = String(text);
+  return td;
+}
+
+function createEmptyRow(colspan, msg) {
+  const tr = document.createElement('tr');
+  const td = document.createElement('td');
+  td.setAttribute('colspan', String(colspan));
+  td.className = 'empty';
+  td.textContent = msg;
+  tr.appendChild(td);
+  return tr;
+}
+
+// ---- Tab switching ----
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    const target = $('tab-' + btn.getAttribute('data-tab'));
+    if (target) target.classList.add('active');
+  });
+});
+
+// ---- Shared state ----
+let tradesSeen = 0;
+const liveTickers = new Set();
+const orderbookData = {};       // ticker -> { yes: [[price, qty], ...], no: [...] }
+const marketRowMap = {};        // ticker -> tr element
+let allMarkets = [];            // raw markets data for filtering/sorting
+let currentSort = { field: 'volume_24h', dir: 'desc' };
+
+// ---- Data fetching: Portfolio ----
+
+async function fetchPortfolio() {
+  try {
+    const res = await fetch('/api/portfolio');
+    const data = await res.json();
+    $('balance').textContent = cents(data.balance);
+    $('portfolio-value').textContent = cents(data.portfolio_value);
+
+    const tbody = $('positions-body');
+    clearChildren(tbody);
+
+    if (!data.positions || data.positions.length === 0) {
+      tbody.appendChild(createEmptyRow(5, 'No open positions'));
+      return;
+    }
+
+    for (const p of data.positions) {
+      const tr = document.createElement('tr');
+
+      const betTd = document.createElement('td');
+      const titleDiv = document.createElement('div');
+      titleDiv.textContent = p.title || p.ticker;
+      betTd.appendChild(titleDiv);
+      const tickerDiv = document.createElement('div');
+      tickerDiv.className = 'bet-title';
+      tickerDiv.textContent = p.ticker;
+      betTd.appendChild(tickerDiv);
+      tr.appendChild(betTd);
+
+      const sideTd = document.createElement('td');
+      const badge = document.createElement('span');
+      badge.className = 'side-badge ' + (p.side || 'yes');
+      badge.textContent = (p.side || (p.position > 0 ? 'YES' : 'NO')).toUpperCase();
+      sideTd.appendChild(badge);
+      tr.appendChild(sideTd);
+
+      tr.appendChild(createTextTd(Math.abs(p.position), 'num'));
+      tr.appendChild(createTextTd(cents(p.market_exposure), 'num'));
+      tr.appendChild(createTextTd(cents(p.realized_pnl), 'num ' + pnlClass(p.realized_pnl)));
+      tbody.appendChild(tr);
+    }
+  } catch (e) {
+    console.error('fetchPortfolio', e);
+  }
+}
+
+// ---- Data fetching: Strategies ----
+
+async function fetchStrategies() {
+  try {
+    const res = await fetch('/api/strategies');
+    const snap = await res.json();
+
+    const summary = $('alloc-summary');
+    clearChildren(summary);
+
+    function addStat(label, value) {
+      const wrap = document.createElement('div');
+      const lbl = document.createElement('div');
+      lbl.className = 'stat-label';
+      lbl.textContent = label;
+      const val = document.createElement('div');
+      val.className = 'stat-value';
+      val.textContent = value;
+      wrap.appendChild(lbl);
+      wrap.appendChild(val);
+      summary.appendChild(wrap);
+    }
+    addStat('Total Cash', cents(snap.totalCash));
+    addStat('Unallocated', cents(snap.unallocatedCash));
+
+    const container = $('strategies-container');
+    clearChildren(container);
+
+    if (!snap.strategies || snap.strategies.length === 0) {
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'empty';
+      emptyDiv.textContent = 'No strategies';
+      container.appendChild(emptyDiv);
+      return;
+    }
+
+    for (const s of snap.strategies) {
+      const totalPnl = s.realizedPnl + s.unrealizedPnl;
+      const card = document.createElement('div');
+      card.className = 'strategy-card';
+
+      const header = document.createElement('div');
+      header.className = 'strategy-header';
+
+      const nameWrap = document.createElement('div');
+      const dot = document.createElement('span');
+      dot.className = 'status-dot ' + (s.status || 'idle');
+      nameWrap.appendChild(dot);
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'strategy-name';
+      nameSpan.textContent = s.name;
+      nameWrap.appendChild(nameSpan);
+      if (!s.enabled) {
+        const disabledSpan = document.createElement('span');
+        disabledSpan.className = 'disabled-label';
+        disabledSpan.textContent = ' (disabled)';
+        nameWrap.appendChild(disabledSpan);
+      }
+      header.appendChild(nameWrap);
+
+      const typeBadge = document.createElement('span');
+      typeBadge.className = 'strategy-type';
+      typeBadge.textContent = s.type || s.id;
+      header.appendChild(typeBadge);
+      card.appendChild(header);
+
+      const barTrack = document.createElement('div');
+      barTrack.className = 'alloc-bar-track';
+      const barFill = document.createElement('div');
+      barFill.className = 'alloc-bar-fill';
+      barFill.style.width = (s.allocationPct * 100).toFixed(0) + '%';
+      barTrack.appendChild(barFill);
+      card.appendChild(barTrack);
+
+      const statsRow = document.createElement('div');
+      statsRow.className = 'strategy-stats';
+      statsRow.style.marginTop = '8px';
+
+      function addCardStat(label, value, cls) {
+        const stat = document.createElement('div');
+        stat.className = 'strategy-stat';
+        const lbl = document.createElement('div');
+        lbl.className = 'label';
+        lbl.textContent = label;
+        stat.appendChild(lbl);
+        const val = document.createElement('div');
+        val.className = 'value' + (cls ? ' ' + cls : '');
+        val.textContent = value;
+        stat.appendChild(val);
+        statsRow.appendChild(stat);
+      }
+
+      addCardStat('Allocation', (s.allocationPct * 100).toFixed(0) + '%');
+      addCardStat('Allocated', cents(s.allocatedCash));
+      addCardStat('Available', cents(s.availableCash));
+      addCardStat('Locked', cents(s.lockedInOrders || 0));
+      addCardStat('P&L', cents(totalPnl), pnlClass(totalPnl));
+      addCardStat('Fees', cents(s.fees || 0));
+      addCardStat('Orders', (s.ordersPlaced || 0) + ' / ' + (s.ordersFilled || 0) + ' / ' + (s.ordersCancelled || 0));
+      card.appendChild(statsRow);
+
+      const posWrap = document.createElement('div');
+      posWrap.className = 'strategy-positions';
+
+      if (s.positions && s.positions.length > 0) {
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        for (const h of ['Ticker', 'Side', 'Qty', 'Avg Cost', 'Price', 'P&L']) {
+          const th = document.createElement('th');
+          th.textContent = h;
+          if (h !== 'Ticker' && h !== 'Side') th.className = 'num';
+          headRow.appendChild(th);
+        }
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        for (const pos of s.positions) {
+          const tr = document.createElement('tr');
+          tr.appendChild(createTextTd(pos.ticker));
+
+          const sideTd = document.createElement('td');
+          const posBadge = document.createElement('span');
+          posBadge.className = 'side-badge ' + pos.side;
+          posBadge.textContent = pos.side.toUpperCase();
+          sideTd.appendChild(posBadge);
+          tr.appendChild(sideTd);
+
+          tr.appendChild(createTextTd(pos.quantity, 'num'));
+          tr.appendChild(createTextTd(cents(pos.avgCostBasis), 'num'));
+          tr.appendChild(createTextTd(cents(pos.currentPrice), 'num'));
+
+          const pnl = pos.unrealizedPnl !== undefined ? pos.unrealizedPnl : ((pos.currentPrice - pos.avgCostBasis) * pos.quantity);
+          tr.appendChild(createTextTd(cents(pnl), 'num ' + pnlClass(pnl)));
+          tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+        posWrap.appendChild(table);
+      } else {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.className = 'empty';
+        emptyMsg.textContent = 'No positions';
+        posWrap.appendChild(emptyMsg);
+      }
+
+      card.appendChild(posWrap);
+      container.appendChild(card);
+    }
+  } catch (e) {
+    console.error('fetchStrategies', e);
+  }
+}
+
+// ---- Data fetching: Markets table ----
+
+async function fetchMarkets() {
+  try {
+    const res = await fetch('/api/markets');
+    const data = await res.json();
+    allMarkets = data.markets || [];
+    $('market-count').textContent = String(allMarkets.length);
+    renderMarkets();
+  } catch (e) {
+    console.error('fetchMarkets', e);
+  }
+}
+
+function renderMarkets() {
+  const searchTerm = ($('market-search').value || '').toLowerCase().trim();
+  const hideInactive = $('hide-inactive').checked;
+
+  // Filter
+  let filtered = allMarkets.filter(m => {
+    if (hideInactive && !m.yes_bid && !m.yes_ask && !m.volume_24h) return false;
+    if (searchTerm) {
+      const haystack = (m.title + ' ' + m.ticker).toLowerCase();
+      if (!haystack.includes(searchTerm)) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  const { field, dir } = currentSort;
+  filtered.sort((a, b) => {
+    let av, bv;
+    if (field === 'title') {
+      av = (a.title || '').toLowerCase();
+      bv = (b.title || '').toLowerCase();
+      return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    } else if (field === 'status') {
+      av = a.status || '';
+      bv = b.status || '';
+      return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    } else if (field === 'spread') {
+      av = (a.yes_ask && a.yes_bid) ? (a.yes_ask - a.yes_bid) : 0;
+      bv = (b.yes_ask && b.yes_bid) ? (b.yes_ask - b.yes_bid) : 0;
+    } else {
+      av = a[field] || 0;
+      bv = b[field] || 0;
+    }
+    return dir === 'asc' ? av - bv : bv - av;
+  });
+
+  $('filtered-count').textContent = String(filtered.length);
+
+  const tbody = $('markets-body');
+  clearChildren(tbody);
+
+  if (filtered.length === 0) {
+    tbody.appendChild(createEmptyRow(8, allMarkets.length ? 'No markets match filter' : 'No open markets'));
+    return;
+  }
+
+  for (const m of filtered) {
+    const tr = document.createElement('tr');
+    tr.className = 'market-row';
+    tr.setAttribute('data-ticker', m.ticker);
+    marketRowMap[m.ticker] = tr;
+
+    // Market name + ticker
+    const nameTd = document.createElement('td');
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'market-title';
+    titleDiv.textContent = m.title;
+    titleDiv.title = m.title;
+    nameTd.appendChild(titleDiv);
+    const tickerDiv = document.createElement('div');
+    tickerDiv.className = 'market-ticker';
+    tickerDiv.textContent = m.ticker;
+    nameTd.appendChild(tickerDiv);
+    tr.appendChild(nameTd);
+
+    // Yes Bid / Ask
+    tr.appendChild(createTextTd(m.yes_bid ? m.yes_bid + 'c' : '-', 'num'));
+    tr.appendChild(createTextTd(m.yes_ask ? m.yes_ask + 'c' : '-', 'num'));
+
+    // Spread
+    const spread = (m.yes_ask && m.yes_bid) ? (m.yes_ask - m.yes_bid) : 0;
+    tr.appendChild(createTextTd(spread ? spread + 'c' : '-', 'num spread'));
+
+    // Last price
+    tr.appendChild(createTextTd(m.last_price ? m.last_price + 'c' : '-', 'num'));
+
+    // Volume 24h
+    tr.appendChild(createTextTd(m.volume_24h ? m.volume_24h.toLocaleString() : '-', 'num'));
+
+    // Open interest
+    tr.appendChild(createTextTd(m.open_interest ? m.open_interest.toLocaleString() : '-', 'num'));
+
+    // Status
+    tr.appendChild(createTextTd(m.status || '-'));
+
+    tbody.appendChild(tr);
+  }
+}
+
+// ---- Filter/sort event listeners ----
+$('market-search').addEventListener('input', renderMarkets);
+$('hide-inactive').addEventListener('change', renderMarkets);
+
+document.querySelectorAll('#tab-markets .sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const field = th.getAttribute('data-sort');
+    if (currentSort.field === field) {
+      currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      currentSort = { field, dir: 'desc' };
+    }
+    // Update header classes
+    document.querySelectorAll('#tab-markets .sortable').forEach(h => {
+      h.classList.remove('active', 'asc', 'desc');
+    });
+    th.classList.add('active', currentSort.dir);
+    renderMarkets();
+  });
+});
+
+// ---- Orderbook rendering ----
+
+function renderOrderbook(ticker) {
+  const content = $('orderbook-content');
+  clearChildren(content);
+
+  const data = orderbookData[ticker];
+  if (!data) {
+    const emptyDiv = document.createElement('div');
+    emptyDiv.className = 'empty';
+    emptyDiv.textContent = 'No orderbook data for ' + ticker;
+    content.appendChild(emptyDiv);
+    return;
+  }
+
+  const title = document.createElement('div');
+  title.className = 'ob-title';
+  title.textContent = ticker;
+  content.appendChild(title);
+
+  function renderSide(label, levels, sideClass) {
+    const sideLabel = document.createElement('div');
+    sideLabel.className = 'ob-side-label';
+    sideLabel.textContent = label;
+    content.appendChild(sideLabel);
+
+    if (!levels || levels.length === 0) {
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'empty';
+      emptyDiv.textContent = 'No levels';
+      content.appendChild(emptyDiv);
+      return;
+    }
+
+    // Flatten: levels can be [[price, qty], ...] or [{price, quantity}, ...]
+    const flat = [];
+    for (const lvl of levels) {
+      if (Array.isArray(lvl)) {
+        if (lvl.length >= 2) flat.push({ price: lvl[0], quantity: lvl[1] });
+      } else if (lvl && typeof lvl === 'object') {
+        flat.push({ price: lvl.price || 0, quantity: lvl.quantity || 0 });
+      }
+    }
+
+    const maxQty = Math.max(1, ...flat.map(l => l.quantity));
+
+    for (const lvl of flat.slice(0, 15)) {
+      const row = document.createElement('div');
+      row.className = 'ob-row ' + sideClass;
+
+      const priceSpan = document.createElement('span');
+      priceSpan.className = 'price';
+      priceSpan.textContent = lvl.price + 'c';
+      row.appendChild(priceSpan);
+
+      const barDiv = document.createElement('div');
+      barDiv.className = 'bar';
+      const fillDiv = document.createElement('div');
+      fillDiv.className = 'ob-bar-fill';
+      fillDiv.style.width = ((lvl.quantity / maxQty) * 100).toFixed(0) + '%';
+      barDiv.appendChild(fillDiv);
+      row.appendChild(barDiv);
+
+      const qtySpan = document.createElement('span');
+      qtySpan.className = 'qty';
+      qtySpan.textContent = String(lvl.quantity);
+      row.appendChild(qtySpan);
+
+      content.appendChild(row);
+    }
+  }
+
+  renderSide('YES Bids', data.yes, 'yes-row');
+  renderSide('NO Bids', data.no, 'no-row');
+}
+
+// ---- Live market row update ----
+
+function updateMarketRow(ticker, d) {
+  const tr = marketRowMap[ticker];
+  if (!tr) return;
+
+  const cells = tr.children;
+  // cells: [name, yes_bid, yes_ask, spread, last, vol, oi, status]
+  const oldBid = cells[1].textContent;
+  const newBid = d.yes_bid ? d.yes_bid + 'c' : '-';
+  cells[1].textContent = newBid;
+  cells[2].textContent = d.yes_ask ? d.yes_ask + 'c' : '-';
+
+  const spread = (d.yes_ask && d.yes_bid) ? (d.yes_ask - d.yes_bid) : 0;
+  cells[3].textContent = spread ? spread + 'c' : '-';
+  cells[4].textContent = d.last_price ? d.last_price + 'c' : '-';
+
+  if (d.volume !== undefined) cells[5].textContent = d.volume ? d.volume.toLocaleString() : '-';
+  if (d.open_interest !== undefined) cells[6].textContent = d.open_interest ? d.open_interest.toLocaleString() : '-';
+
+  // Flash animation
+  tr.classList.remove('flash-green', 'flash-red');
+  void tr.offsetWidth; // reflow
+  if (newBid !== oldBid) {
+    tr.classList.add(parseInt(newBid) >= parseInt(oldBid) ? 'flash-green' : 'flash-red');
+  }
+}
+
+// ---- SSE Live Feed ----
+
+function setupSSE() {
+  const feed = $('feed');
+  let count = 0;
+  const MAX_ITEMS = 300;
+
+  const es = new EventSource('/api/stream');
+
+  es.addEventListener('ticker', (e) => {
+    const d = JSON.parse(e.data);
+    liveTickers.add(d.ticker);
+    $('live-ticker-count').textContent = String(liveTickers.size);
+    updateMarketRow(d.ticker, d);
+    addFeedItem('ticker', d.ticker + '  yes=' + d.yes_bid + '/' + d.yes_ask + '  last=' + d.last_price + '  vol=' + d.volume, d.ts);
+  });
+
+  es.addEventListener('trade', (e) => {
+    const d = JSON.parse(e.data);
+    tradesSeen++;
+    $('trade-count').textContent = String(tradesSeen);
+    addFeedItem('trade', d.ticker + '  ' + d.count + 'x ' + d.side + ' @ ' + d.price + 'c  taker=' + d.taker_side, d.ts);
+  });
+
+  es.addEventListener('orderbook', (e) => {
+    const d = JSON.parse(e.data);
+    orderbookData[d.ticker] = { yes: d.yes || [], no: d.no || [] };
+    // Re-render if this is the most recently viewed ticker
+    const content = $('orderbook-content');
+    const titleEl = content.querySelector('.ob-title');
+    if (titleEl && titleEl.textContent === d.ticker) {
+      renderOrderbook(d.ticker);
+    } else if (!titleEl) {
+      // Show first orderbook we receive
+      renderOrderbook(d.ticker);
+    }
+    addFeedItem('orderbook', d.ticker + '  yes_levels=' + (d.yes ? d.yes.length : 0) + '  no_levels=' + (d.no ? d.no.length : 0), null);
+  });
+
+  es.addEventListener('fill', (e) => {
+    const d = JSON.parse(e.data);
+    addFeedItem('fill', d.ticker + '  ' + d.action + ' ' + d.count + 'x ' + d.side + ' @ ' + d.price + 'c  fee=' + d.fee + 'c', d.ts);
+  });
+
+  es.addEventListener('order_update', (e) => {
+    const d = JSON.parse(e.data);
+    addFeedItem('order', d.ticker + '  ' + d.status + '  filled=' + d.filled_count + ' remain=' + d.remaining_count, d.ts);
+  });
+
+  es.addEventListener('balance', (e) => {
+    const d = JSON.parse(e.data);
+    addFeedItem('balance', 'bal=' + cents(d.balance) + '  portfolio=' + cents(d.portfolio_value), d.ts);
+    fetchPortfolio();
+    fetchStrategies();
+  });
+
+  es.onerror = () => {
+    addFeedItem('ticker', 'Stream disconnected - reconnecting...', new Date().toISOString());
+  };
+
+  function addFeedItem(type, text, ts) {
+    if (count === 0) clearChildren(feed);
+    count++;
+
+    const time = ts ? new Date(ts).toLocaleTimeString() : new Date().toLocaleTimeString();
+    const item = document.createElement('div');
+    item.className = 'feed-item';
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'feed-time';
+    timeSpan.textContent = time;
+    item.appendChild(timeSpan);
+
+    const typeSpan = document.createElement('span');
+    typeSpan.className = 'feed-type ' + type;
+    typeSpan.textContent = type.toUpperCase();
+    item.appendChild(typeSpan);
+
+    const msgSpan = document.createElement('span');
+    msgSpan.textContent = text;
+    item.appendChild(msgSpan);
+
+    feed.prepend(item);
+
+    while (feed.children.length > MAX_ITEMS) {
+      feed.removeChild(feed.lastChild);
+    }
+  }
+}
+
+// ---- Init ----
+fetchPortfolio();
+fetchStrategies();
+fetchMarkets();
+setupSSE();
+
+setInterval(() => { fetchPortfolio(); fetchStrategies(); }, 30000);
+setInterval(fetchMarkets, 30000);
+</script>
+</body>
+</html>

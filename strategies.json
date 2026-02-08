@@ -1,0 +1,26 @@
+[
+  {
+    "id": "arb",
+    "name": "Arbitrage",
+    "type": "ARBITRAGE",
+    "enabled": true,
+    "allocationPct": 0.30,
+    "params": {}
+  },
+  {
+    "id": "value",
+    "name": "Value",
+    "type": "VALUE",
+    "enabled": true,
+    "allocationPct": 0.40,
+    "params": {}
+  },
+  {
+    "id": "news",
+    "name": "News/Event",
+    "type": "NEWS",
+    "enabled": false,
+    "allocationPct": 0.10,
+    "params": {}
+  }
+]
